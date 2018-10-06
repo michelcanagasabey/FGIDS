@@ -1,19 +1,22 @@
+#include <SPI.h>
+#include <SD.h>
 #include <Time.h>
 #include <TimeLib.h>
 #include <DS1302RTC.h>
-#include <SPI.h>
-#include <SD.h>
+
 
 // Set pins:  CE, IO,CLK
 DS1302RTC RTC(5,6,7);
 
-
-
 /* Pin definitions */
 #define COUNTER 8
-#define CHIPSELECT 10
-#define BUTTON 0
 
+#define BUTTON 2
+const int chipSelect = 10;
+#define PWM_DEBUG
+#ifdef PWM_DEBUG
+#define PWM_PIN 3
+#endif
 
 
 
@@ -43,13 +46,20 @@ tmElements_t tnow,tlast;
 
 /*SD*/
 File dataFile;
+long data;
 char fileName[10];
-String dataString = "";
+
+void print2digits(int number) {
+  if (number >= 0 && number < 10)
+    Serial.write('0');
+  Serial.print(number);
+}
 
 void setup()
 {
   pinMode(BUTTON, INPUT);
   pinMode(COUNTER, INPUT);
+  //pinMode(CHIPSELECT, OUTPUT);
   Serial.begin(57600);
   
   overflow_count = 0;
@@ -93,12 +103,11 @@ void setup()
   delay(1000);
   
   //Turn off timer0
-  TCCR0B = 0x00;
-  TIMSK0 = 0x00;
+  //TCCR0B = 0x00;
+  //TIMSK0 = 0x00;
 
   if (RTC.haltRTC()) {
    Serial.println("The DS1302 is stopped.  Please run the SetTime");
-   Serial.println("example to initialize the time and begin running.");
    Serial.println();
   }
   if (!RTC.writeEN()) {
@@ -106,19 +115,57 @@ void setup()
     Serial.println();
   }
   RTC.writeEN(0);
-
-  if (! RTC.read(tnow)) {
+  delay(1000);
+ if (! RTC.read(tnow)) {
     Serial.println("The DS1302 is write protected. This normal.");
+    Serial.print("  Time = ");
+    print2digits(tnow.Hour);
+    Serial.write(':');
+    print2digits(tnow.Minute);
+    Serial.write(':');
+    print2digits(tnow.Second);
+    Serial.print(", Date (D/M/Y) = ");
+    Serial.print(tnow.Day);
+    Serial.write('/');
+    Serial.print(tnow.Month);
+    Serial.write('/');
+    Serial.print(tmYearToCalendar(tnow.Year));
+    Serial.print(", DoW = ");
+    Serial.print(tnow.Wday);
+    Serial.println();
     }
-  
-  if (SD.begin(CHIPSELECT)) {
-      dataFile = SD.open("TEXTFILE.TXT",FILE_WRITE);
+
+  Serial.println("sd");
+  fileName[0] = tnow.Day/10 +0x30;
+  fileName[1] = tnow.Day%10 +0x30;
+  fileName[2] = '-';
+  fileName[3] = tnow.Month/10 +0x30;
+  fileName[4] = tnow.Month%10 +0x30;
+  fileName[5] = '.';
+  fileName[6] = 'T';
+  fileName[7] = 'X';
+  fileName[8] = 'T'; 
+  fileName[9] = '\0'; 
+  Serial.println(fileName);
+  if (SD.begin(chipSelect)) {
+      dataFile = SD.open(fileName,FILE_WRITE);
+      if(dataFile)
+      {
+        Serial.println("SD success");
+        dataFile.close(); 
+      }       
   }
   else
   {
     Serial.println("Card failed, or not present");
   }
-  
+#ifdef PWM_DEBUG
+pinMode(PWM_PIN, OUTPUT);
+analogWrite(PWM_PIN, 128);
+#endif
+
+tlast.Hour = tnow.Hour;
+tlast.Minute = tnow.Minute;  
 
 }
 
@@ -155,16 +202,28 @@ ISR(TIMER1_CAPT_vect)
 
 void loop()
 {
+ 
+  Serial.println("in Main");
+  delay(1000);
   if (! RTC.read(tnow)) {
+    print2digits(tnow.Hour);
+    Serial.write(':');
+    print2digits(tnow.Minute);
+    Serial.write(',');
+    print2digits(tlast.Hour);
+    Serial.write(':');
+    print2digits(tlast.Minute);
+    Serial.write('\n');
     /* check log time */
     if(tlast.Hour != tnow.Hour || (tnow.Minute - tlast.Minute) > LOG_TIMEOUT)
     {
       tlast.Hour = tnow.Hour;
       tlast.Minute = tnow.Minute;
       timeToLog = true;
-    }
-
-    
+      Serial.println("timeToLog = true");
+      //TCCR1B = 0b00000001; //No Noise Canceler, Falling Edge, Prescaler=1
+      //TIMSK1 = 0b00100001; //Input Capture and Overflow Interrupts
+    }   
   
   }
   else {
