@@ -6,22 +6,22 @@
 
 
 // Set pins:  CE, IO,CLK
-DS1302RTC RTC(5,6,7);
+DS1302RTC RTC(14,15,16);
 
 /* Pin definitions */
 #define COUNTER 8
-
 #define BUTTON 2
+#define RED_LED 5
+
 const int chipSelect = 10;
+
 #define PWM_DEBUG
 #ifdef PWM_DEBUG
 #define PWM_PIN 3
 #endif
 
-
-
-
-#define LOG_TIMEOUT 1
+#define FREQUENCY_SAMPLES 10
+#define LOG_TIMEOUT 0
 #define CPU_FREQUENCY 15992430.43 /* must be a float. use 16000000.0 as default */
 #define CAPACITY 0.0000000005 /* in Farad */
 #define ZERO_INDUCTANCE 1.86 /* in microHenry (uH) */
@@ -40,28 +40,40 @@ float measured_inductance;
 float zero_calibration;
 float adjusted_inductance;
 bool timeToLog = false;
+uint8_t rtcErrorCnt = 0;
+uint8_t samples =0; 
+float frequency =0;
+
 
 /*RTC*/
 tmElements_t tnow,tlast;
 
 /*SD*/
 File dataFile;
-long data;
 char fileName[10];
 
-void print2digits(int number) {
+void print2digits(int number)
+{
   if (number >= 0 && number < 10)
     Serial.write('0');
   Serial.print(number);
+}
+
+void print2digitsToSD(int number)
+{
+  if (number >= 0 && number < 10)    
+    dataFile.print('0');
+  dataFile.print(String(number));  
 }
 
 void setup()
 {
   pinMode(BUTTON, INPUT);
   pinMode(COUNTER, INPUT);
+  pinMode(RED_LED, OUTPUT);
   //pinMode(CHIPSELECT, OUTPUT);
   Serial.begin(57600);
-  
+ 
   overflow_count = 0;
   capture_count = 0;
   capture_count_sav = 0;
@@ -98,26 +110,33 @@ void setup()
    * Bit 1 – OCIE1A: Timer/Counter1, Output Compare A Match Interrupt Enable
    * Bit 0 – TOIE1: Timer/Counter1, Overflow Interrupt Enable
    */
-    TIMSK1 = 0b00100001; //Input Capture and Overflow Interrupts
+    //TIMSK1 = 0b00100001; //Input Capture and Overflow Interrupts
 
   delay(1000);
-  
-  //Turn off timer0
-  //TCCR0B = 0x00;
-  //TIMSK0 = 0x00;
 
-  if (RTC.haltRTC()) {
+  if (RTC.haltRTC())
+  {
    Serial.println("The DS1302 is stopped.  Please run the SetTime");
    Serial.println();
   }
-  if (!RTC.writeEN()) {
+  if (!RTC.writeEN())
+  {
     Serial.println("The DS1302 is write protected. This normal.");
     Serial.println();
   }
   RTC.writeEN(0);
-  delay(1000);
- if (! RTC.read(tnow)) {
-    Serial.println("The DS1302 is write protected. This normal.");
+  delay(2000);
+  RTC.read(tnow);
+  RTC.read(tnow);
+  
+  //setTime(11,49,0,7,10,2018);
+  //time_t t = now();
+  //Serial.println(t);
+ // RTC.set(t);
+  
+ 
+ if (! RTC.read(tnow))
+ {
     Serial.print("  Time = ");
     print2digits(tnow.Hour);
     Serial.write(':');
@@ -133,7 +152,7 @@ void setup()
     Serial.print(", DoW = ");
     Serial.print(tnow.Wday);
     Serial.println();
-    }
+ }
 
   Serial.println("sd");
   fileName[0] = tnow.Day/10 +0x30;
@@ -147,17 +166,20 @@ void setup()
   fileName[8] = 'T'; 
   fileName[9] = '\0'; 
   Serial.println(fileName);
-  if (SD.begin(chipSelect)) {
-      dataFile = SD.open(fileName,FILE_WRITE);
-      if(dataFile)
-      {
-        Serial.println("SD success");
-        dataFile.close(); 
-      }       
+  if (SD.begin(chipSelect))
+  {
+    dataFile = SD.open(fileName,FILE_WRITE);
+    if(dataFile)
+    {
+     Serial.println("SD success");
+     dataFile.close(); 
+    }       
   }
   else
   {
     Serial.println("Card failed, or not present");
+    digitalWrite(RED_LED, HIGH);
+    while(1);
   }
 #ifdef PWM_DEBUG
 pinMode(PWM_PIN, OUTPUT);
@@ -202,39 +224,87 @@ ISR(TIMER1_CAPT_vect)
 
 void loop()
 {
- 
-  Serial.println("in Main");
-  delay(1000);
-  if (! RTC.read(tnow)) {
-    print2digits(tnow.Hour);
-    Serial.write(':');
-    print2digits(tnow.Minute);
-    Serial.write(',');
-    print2digits(tlast.Hour);
-    Serial.write(':');
-    print2digits(tlast.Minute);
-    Serial.write('\n');
-    /* check log time */
-    if(tlast.Hour != tnow.Hour || (tnow.Minute - tlast.Minute) > LOG_TIMEOUT)
+  RTC.read(tnow);
+  delay(1000);  
+  if(!timeToLog)
+  {
+  
+    uint8_t temp = RTC.read(tnow);
+    if (temp==0 && rtcErrorCnt < 2)
     {
-      tlast.Hour = tnow.Hour;
-      tlast.Minute = tnow.Minute;
-      timeToLog = true;
-      Serial.println("timeToLog = true");
-      //TCCR1B = 0b00000001; //No Noise Canceler, Falling Edge, Prescaler=1
-      //TIMSK1 = 0b00100001; //Input Capture and Overflow Interrupts
-    }   
+      /*
+      print2digits(tnow.Hour);
+      Serial.write(':');
+      print2digits(tnow.Minute);
+      Serial.write(' , ');
+      print2digits(tlast.Hour);
+      Serial.write(':');
+      print2digits(tlast.Minute);
+      Serial.write('\n');
+      */
+      rtcErrorCnt = 0;
+      /* check log time */
+      if(tlast.Hour != tnow.Hour || (tnow.Minute - tlast.Minute) > LOG_TIMEOUT)
+      {
+        tlast.Hour = tnow.Hour;
+        tlast.Minute = tnow.Minute;
+        timeToLog = true;
+        samples = 0;
+        TIMSK1 = 0b00100001; //Input Capture and Overflow Interrupts
+      }   
   
-  }
-  else {
-    Serial.println("DS1302 read error!  Please check the circuitry.");
-  }
-  
+    }
+    else if(temp != 0)
+    {
+      rtcErrorCnt++;
+    }
+    else 
+    {
+      Serial.println("DS1302 read error!  Please check the circuitry.");
+      rtcErrorCnt = 0;
+    }
+  }  
   if(done==1)
   {
     measured_frequency = (CPU_FREQUENCY * capture_count_sav) / total_count_sav;
-    Serial.print("Freq:        kHz");
-    Serial.println(measured_frequency/1000);
+    samples++;
+    //Serial.print(measured_frequency);
+    //Serial.print("Hz");
+    //Serial.print(",");
+    //Serial.println(samples);
+    frequency += measured_frequency;
+    if(samples >= FREQUENCY_SAMPLES)
+    {
+      frequency /= FREQUENCY_SAMPLES;
+      dataFile = SD.open(fileName, FILE_WRITE);
+      print2digits(tlast.Hour);
+      Serial.print(":");
+      print2digits(tlast.Minute);
+      Serial.print(",");
+      Serial.println(frequency);
+      if (dataFile)
+      {
+        print2digitsToSD(tlast.Hour);
+        dataFile.print(":");
+        print2digitsToSD(tlast.Minute);
+        dataFile.print(",");
+        dataFile.println(String(frequency));
+        dataFile.close();
+        digitalWrite(RED_LED, LOW);
+      }
+      else
+      {
+        Serial.println("SD error");
+        digitalWrite(RED_LED, HIGH);
+      }
+      TIMSK1 = 0x00;//0b00100001; //Input Capture and Overflow Interrupts
+      timeToLog = false;
+      frequency =0;
+    }
+    
+    done = 0;
+    
+    /*    
     measured_inductance = 2 * PI * measured_frequency * sqrt(CAPACITY);
     measured_inductance = 1000000 / (measured_inductance * measured_inductance);
     
@@ -255,7 +325,8 @@ void loop()
 
       Serial.print(adjusted_inductance);
     }
-    done = 0;
+    
+*/
   }
   else if(done==2)
   {
@@ -273,6 +344,7 @@ void loop()
       Serial.println(zero_calibration);
     }
     done = 0;
+    TIMSK1 = 0x00;
   }
 }
 
