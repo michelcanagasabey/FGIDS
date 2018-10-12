@@ -3,6 +3,7 @@
 #include <Time.h>
 #include <TimeLib.h>
 #include <DS1302RTC.h>
+#include<Wire.h>
 
 
 // Set pins:  CE, IO,CLK
@@ -12,6 +13,8 @@ DS1302RTC RTC(14,15,16);
 #define COUNTER 8
 #define BUTTON 2
 #define RED_LED 5
+#define MPU1_ADDRESS 0x68
+#define MPU2_ADDRESS 0x69  
 
 const int chipSelect = 10;
 
