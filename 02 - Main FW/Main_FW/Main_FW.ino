@@ -47,7 +47,6 @@ uint8_t rtcErrorCnt = 0;
 uint8_t samples =0; 
 float frequency =0;
 
-
 /*RTC*/
 tmElements_t tnow,tlast;
 
@@ -55,6 +54,27 @@ tmElements_t tnow,tlast;
 File dataFile;
 char fileName[10];
 
+enum{
+  SITTING = 1,
+  STANDING = 2,
+  SLEEPING =3,
+  ERROR = 4
+}position;
+
+int16_t get_az(uint8_t address)
+{
+  Wire.begin();
+  Wire.beginTransmission(address);
+  Wire.write(0x6B);  // PWR_MGMT_1 register
+  Wire.write(0);     // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
+  Wire.beginTransmission(address);
+  Wire.write(0x3F);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.endTransmission(false);
+  Wire.requestFrom(address,2,true);
+  int16_t ACZ = Wire.read()<<8|Wire.read();
+  return ACZ;
+}
 void print2digits(int number)
 {
   if (number >= 0 && number < 10)
@@ -279,19 +299,24 @@ void loop()
     if(samples >= FREQUENCY_SAMPLES)
     {
       frequency /= FREQUENCY_SAMPLES;
+      int16_t acceleration = get_az(MPU1_ADDRESS);
       dataFile = SD.open(fileName, FILE_WRITE);
       print2digits(tlast.Hour);
       Serial.print(":");
       print2digits(tlast.Minute);
       Serial.print(",");
-      Serial.println(frequency);
+      Serial.print(frequency);
+      Serial.print(",");
+      Serial.println(acceleration);
       if (dataFile)
       {
         print2digitsToSD(tlast.Hour);
         dataFile.print(":");
         print2digitsToSD(tlast.Minute);
         dataFile.print(",");
-        dataFile.println(String(frequency));
+        dataFile.print(String(frequency));
+        dataFile.print(",");
+        dataFile.println(acceleration);
         dataFile.close();
         digitalWrite(RED_LED, LOW);
       }
