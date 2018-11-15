@@ -19,7 +19,8 @@
 
 // Set pins:  CE, IO,CLK
 //DS1302RTC RTC(27, 29, 31);
-DS1302RTC RTC(7, 8,9);
+//DS1302RTC RTC(7, 8,9);
+DS1302RTC RTC(6,14,9);
 
 // Optional connection for RTC module
 #define DS1302_GND_PIN 5
@@ -57,10 +58,10 @@ void setup()
   RTC.writeEN(0);
    
   //setTime(0,43,0,16,12,2014);
- // setTime(13,3,0,16,9,2018);
-  //time_t t = now();
-  //Serial.println(t);
-//  RTC.set(t);
+ setTime(13,3,0,16,9,2018);
+ time_t t = now();
+ Serial.println(t);
+  RTC.set(t);
 }
 
 void loop()

@@ -30,11 +30,11 @@ void setup()
   pinMode(CAPTURE_INT, OUTPUT);
   pinMode(OVERFLOW_INT, OUTPUT);
    pinMode(PWM_PIN, OUTPUT);
-   // TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz}
+  TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz}
 
    analogWrite(PWM_PIN, 128);
    Serial.begin(57600);
-  
+  Serial.println("welcome");
   overflow_count = 0;
   capture_count = 0;
   capture_count_sav = 0;
@@ -62,8 +62,8 @@ void setup()
    * Bit 2:0 – CS12:0: Clock Select
    */
   
-  TCCR1B = 0b00000001; //No Noise Canceler, Falling Edge, Prescaler=1
-  
+  //TCCR1B = 0b00000001; //No Noise Canceler, Falling Edge, Prescaler=1
+  TCCR1B = 0b00000001;
   /*
    * TIMSK1 – Timer/Counter1 Interrupt Mask Register, page 136
    * Bit 7, 6 – Reserved
@@ -114,6 +114,7 @@ ISR(TIMER1_CAPT_vect)
     capture_count = 0;
     overflow_count = 0;
     done = 1;
+    cli();
   }
   digitalWrite(CAPTURE_INT, LOW);
 }
@@ -125,9 +126,9 @@ void loop()
     measured_frequency = (CPU_FREQUENCY * capture_count_sav) / total_count_sav;
     Serial.print("Freq:        kHz");
     Serial.println(measured_frequency/1000);
-    measured_inductance = 2 * PI * measured_frequency * sqrt(CAPACITY);
-    measured_inductance = 1000000 / (measured_inductance * measured_inductance);
-    if(digitalRead(BUTTON)==0) //Button pressed
+    //measured_inductance = 2 * PI * measured_frequency * sqrt(CAPACITY);
+    //measured_inductance = 1000000 / (measured_inductance * measured_inductance);
+    /*if(digitalRead(BUTTON)==0) //Button pressed
     {
       zero_calibration = measured_inductance;
     }
@@ -143,7 +144,8 @@ void loop()
       Serial.print("Induc:        uH");
 
       Serial.print(adjusted_inductance);
-    }
+    }*/
+    sei();
     done = 0;
   }
   else if(done==2)
