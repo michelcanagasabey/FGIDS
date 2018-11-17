@@ -1,6 +1,6 @@
 
 #include<Wire.h>
-const int MPU_addr=0x68;  // I2C address of the MPU-6050
+const int MPU_addr=0x69;  // I2C address of the MPU-6050
 int16_t AcZ, Tmp;
 void setup(){
   Wire.begin();

@@ -7,7 +7,7 @@
 
 
 // Set pins:  CE, IO,CLK
-DS1302RTC RTC(14,15,16);
+DS1302RTC RTC(14,15,9);
 
 /* Pin definitions */
 #define COUNTER 8
@@ -18,7 +18,7 @@ DS1302RTC RTC(14,15,16);
 
 const int chipSelect = 10;
 
-#define PWM_DEBUG
+//#define PWM_DEBUG
 #ifdef PWM_DEBUG
 #define PWM_PIN 3
 #endif
@@ -46,6 +46,7 @@ bool timeToLog = false;
 uint8_t rtcErrorCnt = 0;
 uint8_t samples =0; 
 float frequency =0;
+int32_t acceleration1, acceleration2;
 
 /*RTC*/
 tmElements_t tnow,tlast;
@@ -63,16 +64,18 @@ enum{
 
 int16_t get_az(uint8_t address)
 {
-  Wire.begin();
-  Wire.beginTransmission(address);
-  Wire.write(0x6B);  // PWR_MGMT_1 register
-  Wire.write(0);     // set to zero (wakes up the MPU-6050)
-  Wire.endTransmission(true);
+ // Wire.begin();
+ // Wire.beginTransmission(address);
+ // Wire.write(0x6B);  // PWR_MGMT_1 register
+ // Wire.write(0);     // set to zero (wakes up the MPU-6050)
+ // Wire.endTransmission(true);
   Wire.beginTransmission(address);
   Wire.write(0x3F);  // starting with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
   Wire.requestFrom(address,2,true);
   int16_t ACZ = Wire.read()<<8|Wire.read();
+  //Serial.println(ACZ);
+  Wire.endTransmission(true);
   return ACZ;
 }
 void print2digits(int number)
@@ -148,7 +151,7 @@ void setup()
     Serial.println();
   }
   RTC.writeEN(0);
-  delay(2000);
+  delay(1000);
   RTC.read(tnow);
   RTC.read(tnow);
   
@@ -156,7 +159,9 @@ void setup()
   //time_t t = now();
   //Serial.println(t);
  // RTC.set(t);
-  
+  setTime(22,20,0,17,10,2018);
+ time_t t = now();
+ Serial.println(t);
  
  if (! RTC.read(tnow))
  {
@@ -212,6 +217,16 @@ analogWrite(PWM_PIN, 128);
 tlast.Hour = tnow.Hour;
 tlast.Minute = tnow.Minute;  
 
+  Wire.begin();
+  Wire.beginTransmission(0x68);
+  Wire.write(0x6B);  // PWR_MGMT_1 register
+  Wire.write(0);     // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
+
+  Wire.beginTransmission(0x69);
+  Wire.write(0x6B);  // PWR_MGMT_1 register
+  Wire.write(0);     // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
 }
 
 ISR(TIMER1_OVF_vect)
@@ -291,6 +306,11 @@ void loop()
   {
     measured_frequency = (CPU_FREQUENCY * capture_count_sav) / total_count_sav;
     samples++;
+    acceleration1 += get_az(MPU1_ADDRESS);
+    acceleration2 += get_az(MPU2_ADDRESS);
+    //Serial.print(acceleration1);
+    //Serial.print(",");
+    //Serial.println(acceleration2);
     //Serial.print(measured_frequency);
     //Serial.print("Hz");
     //Serial.print(",");
@@ -299,7 +319,8 @@ void loop()
     if(samples >= FREQUENCY_SAMPLES)
     {
       frequency /= FREQUENCY_SAMPLES;
-      int16_t acceleration = get_az(MPU1_ADDRESS);
+      acceleration1 /= FREQUENCY_SAMPLES;
+      acceleration2 /= FREQUENCY_SAMPLES;
       dataFile = SD.open(fileName, FILE_WRITE);
       print2digits(tlast.Hour);
       Serial.print(":");
@@ -307,7 +328,9 @@ void loop()
       Serial.print(",");
       Serial.print(frequency);
       Serial.print(",");
-      Serial.println(acceleration);
+      Serial.print(acceleration1);
+      Serial.print(",");
+      Serial.println(acceleration2);
       if (dataFile)
       {
         print2digitsToSD(tlast.Hour);
@@ -316,7 +339,9 @@ void loop()
         dataFile.print(",");
         dataFile.print(String(frequency));
         dataFile.print(",");
-        dataFile.println(acceleration);
+        dataFile.print(acceleration1);
+        dataFile.print(",");
+        dataFile.println(acceleration2);
         dataFile.close();
         digitalWrite(RED_LED, LOW);
       }
@@ -359,18 +384,6 @@ void loop()
   else if(done==2)
   {
     Serial.print("Not resonating  ");
-    if(abs(zero_calibration)<1)
-    {
-       Serial.print("Calib:        nH");
-
-      Serial.println(1000*zero_calibration);      
-    }
-    else
-    {
-
-      Serial.print("Calib:        uH");
-      Serial.println(zero_calibration);
-    }
     done = 0;
     TIMSK1 = 0x00;
   }

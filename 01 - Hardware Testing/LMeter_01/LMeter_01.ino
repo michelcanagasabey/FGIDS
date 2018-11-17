@@ -124,8 +124,8 @@ void loop()
   if(done==1)
   {
     measured_frequency = (CPU_FREQUENCY * capture_count_sav) / total_count_sav;
-    Serial.print("Freq:        kHz");
-    Serial.println(measured_frequency/1000);
+    Serial.print("Freq:        Hz");
+    Serial.println(measured_frequency);
     //measured_inductance = 2 * PI * measured_frequency * sqrt(CAPACITY);
     //measured_inductance = 1000000 / (measured_inductance * measured_inductance);
     /*if(digitalRead(BUTTON)==0) //Button pressed

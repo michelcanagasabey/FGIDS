@@ -20,7 +20,7 @@
 // Set pins:  CE, IO,CLK
 //DS1302RTC RTC(27, 29, 31);
 //DS1302RTC RTC(7, 8,9);
-DS1302RTC RTC(6,14,9);
+DS1302RTC RTC(14,15,9);
 
 // Optional connection for RTC module
 #define DS1302_GND_PIN 5
@@ -36,11 +36,11 @@ void setup()
   Serial.println("-------------------");
   
   // Activate RTC module
-  digitalWrite(DS1302_GND_PIN, LOW);
-  pinMode(DS1302_GND_PIN, OUTPUT);
+  //digitalWrite(DS1302_GND_PIN, LOW);
+  //pinMode(DS1302_GND_PIN, OUTPUT);
 
-  digitalWrite(DS1302_VCC_PIN, HIGH);
-  pinMode(DS1302_VCC_PIN, OUTPUT);
+  //digitalWrite(DS1302_VCC_PIN, HIGH);
+  //pinMode(DS1302_VCC_PIN, OUTPUT);
   
   Serial.println("RTC module activated");
   Serial.println();
