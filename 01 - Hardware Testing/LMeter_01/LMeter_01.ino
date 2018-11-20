@@ -22,10 +22,11 @@ float measured_frequency;
 float measured_inductance;
 float zero_calibration;
 float adjusted_inductance;
-
+  uint32_t cnt=0;
+  bool state = false;
 void setup()
 {
-  pinMode(BUTTON, INPUT);
+  pinMode(BUTTON, OUTPUT);
   pinMode(COUNTER, INPUT);
   pinMode(CAPTURE_INT, OUTPUT);
   pinMode(OVERFLOW_INT, OUTPUT);
@@ -42,6 +43,7 @@ void setup()
   total_count_sav = 0;
   done = 0;
   zero_calibration = ZERO_INDUCTANCE;
+
   
   /*
    * TCCR1A – Timer/Counter1 Control Register A, page 132
@@ -165,6 +167,16 @@ void loop()
     }
     done = 0;
   }
+  if(cnt++ >1000000)
+  {
+    state=!state;
+    digitalWrite(BUTTON,state);
+    cnt =0;
+  }
+  
+  
+  
+  
 }
 
 

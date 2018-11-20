@@ -18,13 +18,19 @@
 #include <DS1302RTC.h>
 
 // Set pins:  CE, IO,CLK
-//DS1302RTC RTC(27, 29, 31);
-//DS1302RTC RTC(7, 8,9);
-DS1302RTC RTC(14,15,9);
+#define MOD2
+
+#if defined (MOD1)
+  DS1302RTC RTC(17,16,15);
+  #define DS1302_GND_PIN 14
+
+#else #if defined (MOD2)
+  DS1302RTC RTC(14,15,16);
+  #define DS1302_GND_PIN 17
+#endif
+
 
 // Optional connection for RTC module
-#define DS1302_GND_PIN 5
-#define DS1302_VCC_PIN 6
 
 void setup()
 {
@@ -36,9 +42,9 @@ void setup()
   Serial.println("-------------------");
   
   // Activate RTC module
-  //digitalWrite(DS1302_GND_PIN, LOW);
-  //pinMode(DS1302_GND_PIN, OUTPUT);
-
+  
+  pinMode(DS1302_GND_PIN, OUTPUT);
+  digitalWrite(DS1302_GND_PIN, LOW);
   //digitalWrite(DS1302_VCC_PIN, HIGH);
   //pinMode(DS1302_VCC_PIN, OUTPUT);
   
@@ -58,10 +64,10 @@ void setup()
   RTC.writeEN(0);
    
   //setTime(0,43,0,16,12,2014);
- setTime(13,3,0,16,9,2018);
+ setTime(20,32,0,19,11,2018);
  time_t t = now();
  Serial.println(t);
-  RTC.set(t);
+ //RTC.set(t);
 }
 
 void loop()
